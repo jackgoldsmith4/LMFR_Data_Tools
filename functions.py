@@ -176,7 +176,7 @@ def executeSalesforceIngestJob(operation, importData, objectType, session, uri):
 
 # generic function to upload Account (both donor and nonprofit) data to Salesforce
 def uploadAccounts(salesforceAccountsDF, adminAccountsDF, accountType, session, uri):
-    adminAccountsDF.columns = ['Parent Name', 'Name', 'Phone', 'Line1', 'Line2', 'ShippingCity', 'ShippingState', 'ShippingPostalCode']
+    adminAccountsDF.columns = ['Parent Name', 'Name', 'Line1', 'Line2', 'ShippingCity', 'ShippingState', 'ShippingPostalCode', 'County', 'Total Weight', 'Total Rescues']
 
     # clean Accounts data
     salesforceAccountsDF = salesforceAccountsDF[salesforceAccountsDF['RecordTypeId'] == accountType]
@@ -227,9 +227,6 @@ def uploadAccounts(salesforceAccountsDF, adminAccountsDF, accountType, session, 
     uploadDF.drop_duplicates(inplace=True)
     uploadDF = uploadDF.reset_index().drop(axis='columns', columns=['Parent Name', 'index'])
     
-    # fix phone number formatting
-    if not uploadDF['Phone'].dtype == 'object':
-        uploadDF['Phone'] = uploadDF['Phone'].astype('Int64')
     # fix zip code formatting
     if not uploadDF['ShippingPostalCode'].dtype == 'object':
         uploadDF['ShippingPostalCode'] = uploadDF['ShippingPostalCode'].astype('Int64')
@@ -252,9 +249,6 @@ def uploadAccounts(salesforceAccountsDF, adminAccountsDF, accountType, session, 
         parentId = salesforceAccountsDF[salesforceAccountsDF['Name'] == parentName]['Id'].item()
         uploadDF2.at[index, 'ParentId'] = parentId
         
-    # fix phone number formatting
-    if not uploadDF2['Phone'].dtype == 'object':
-        uploadDF2['Phone'] = uploadDF2['Phone'].astype('Int64')
     # fix zip code formatting
     if not uploadDF2['ShippingPostalCode'].dtype == 'object':
         uploadDF2['ShippingPostalCode'] = uploadDF2['ShippingPostalCode'].astype('Int64')
@@ -320,9 +314,8 @@ def uploadFoodDonors(accountsDF, session, uri):
     # load in donor data from admin tool
     donorsDF = pd.read_csv('lastmile_donors.csv')
 
-    # filter out inactive accounts and unnecessary data columns
-    donorsDF = donorsDF[donorsDF['Status'] == 'Active']
-    donorsDF = donorsDF[['Donor name', 'Location name', 'Phone', 'Line1', 'Line2', 'City', 'State', 'Zip']]
+    # filter out unnecessary data columns
+    donorsDF = donorsDF[['Name', 'location_name', 'line1', 'line2', 'city', 'state', 'zip', 'total_weight', 'total_rescues', 'county']]
 
     # upload Food Donors (type ID: '0123t000000YYv2AAG') to Salesforce
     uploadAccounts(accountsDF, donorsDF, '0123t000000YYv2AAG', session, uri)
@@ -332,9 +325,11 @@ def uploadNonprofitPartners(accountsDF, session, uri):
     # load in partner data from admin tool
     partnersDF = pd.read_csv('lastmile_partners.csv')
 
-    # filter out inactive accounts and unnecessary data columns
-    partnersDF = partnersDF[partnersDF['Status'] == 'Active']
-    partnersDF = partnersDF[['Recipient name', 'Location name', 'Phone', 'Line1', 'Line2', 'City', 'State', 'Zip']]
+    # filter out unnecessary data columns
+    partnersDF = partnersDF[['Name', 'location_name', 'line1', 'line2', 'city', 'state', 'zip', 'Weight', 'rescues']]
+    
+    # add dummy column for county because admin tool nonprofits data doesn't store county
+    partnersDF['county'] = ''
 
     # upload Nonprofit Partners (type ID: '0123t000000YYv3AAG') to Salesforce
     uploadAccounts(accountsDF, partnersDF, '0123t000000YYv3AAG', session, uri)
