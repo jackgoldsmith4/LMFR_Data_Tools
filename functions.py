@@ -344,10 +344,12 @@ def uploadVolunteers(contactsDF, session, uri):
     salesforceVolunteersDF = salesforceVolunteersDF[['Id', 'Name']]
 
     # clean up columns
-    # TODO: make MailingStreet consist of both Line1 and Line2 fields (currently just Line1)
-    volunteersDF = volunteersDF[['Name', 'Email', 'Phone', 'Line1', 'City', 'State', 'Zip']]
-    volunteersDF.columns = ['Name', 'Email', 'Phone', 'MailingStreet', 'MailingCity', 'MailingState', 'MailingPostalCode']
+    volunteersDF = volunteersDF[['first_name', 'last_name', 'email', 'phone', 'address', 'city', 'state', 'zip', 'county']]
+    volunteersDF.columns = ['FirstName', 'LastName', 'Email', 'Phone', 'MailingStreet', 'MailingCity', 'MailingState', 'MailingPostalCode', 'County']
 
+    # create one temp Name column for merging with Salesforce
+    volunteersDF['Name'] = volunteersDF['FirstName'] + ' ' + volunteersDF['LastName']
+    
     # cleanup whitespace in the Name fields to increase matches
     volunteersDF = cleanupNameWhitespace(volunteersDF, 'Name')
     salesforceVolunteersDF = cleanupNameWhitespace(salesforceVolunteersDF, 'Name')
@@ -361,14 +363,8 @@ def uploadVolunteers(contactsDF, session, uri):
     volunteersNotInSalesforceDF['AccountId'] = '0013t00001teMBwAAM'
     volunteersNotInSalesforceDF['Phone'] = volunteersNotInSalesforceDF['Phone'].astype('Int64')
 
-    # split Name column into FirstName and LastName columns
-    volunteersNotInSalesforceDF['FirstName'] = volunteersNotInSalesforceDF['Name']
-    volunteersNotInSalesforceDF['LastName'] = volunteersNotInSalesforceDF['Name']
-    for index, row in volunteersNotInSalesforceDF.iterrows():
-        volunteersNotInSalesforceDF.at[index, 'FirstName'] = ' '.join(volunteersNotInSalesforceDF.at[index, 'Name'].split()[0:-1])
-        volunteersNotInSalesforceDF.at[index, 'LastName'] = volunteersNotInSalesforceDF.at[index, 'Name'].split()[-1]
-    volunteersNotInSalesforceDF.drop(axis='columns', columns=['Name'], inplace=True)
-    volunteersNotInSalesforceDF = volunteersNotInSalesforceDF[['FirstName', 'LastName', 'Email', 'Phone', 'MailingStreet', 'MailingCity', 'MailingState', 'MailingPostalCode', 'AccountId']]
+    # clean up columns
+    volunteersNotInSalesforceDF = volunteersNotInSalesforceDF[['FirstName', 'LastName', 'Email', 'Phone', 'MailingStreet', 'MailingCity', 'MailingState', 'MailingPostalCode', 'County', 'AccountId']]
 
     # upload Volunteers to Salesforce
     executeSalesforceIngestJob('insert', volunteersNotInSalesforceDF.to_csv(index=False), 'Contact', session, uri)
