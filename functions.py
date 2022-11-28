@@ -267,6 +267,10 @@ def uploadFoodRescues(rescuesDF, session, uri):
     rescuesDF.drop(axis='columns', columns=['donor_name', 'recipient_name'], inplace=True)
     rescuesDF = rescuesDF[(rescuesDF['rescue_state'] == 'Canceled') | (rescuesDF['rescue_state'] == 'Complete')]
     rescuesDF = rescuesDF.reset_index().drop(axis='columns', columns='index')
+    
+    # change new field values for rescue state (Complete, Canceled) to be compatible with Salesforce fields (completed, canceled)
+    rescuesDF['rescue_state'] = rescuesDF['rescue_state'].str.replace('Complete', 'completed')
+    rescuesDF['rescue_state'] = rescuesDF['rescue_state'].str.replace('Canceled', 'canceled')
 
     # get list of Food Donors
     salesforceDonorsDF = salesforceAccountsDF[salesforceAccountsDF['RecordTypeId'] == '0123t000000YYv2AAG']
