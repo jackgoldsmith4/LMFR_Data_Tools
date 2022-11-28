@@ -176,7 +176,8 @@ def executeSalesforceIngestJob(operation, importData, objectType, session, uri):
 
 # generic function to upload Account (both donor and nonprofit) data to Salesforce
 def uploadAccounts(salesforceAccountsDF, adminAccountsDF, accountType, session, uri):
-    adminAccountsDF.columns = ['Parent Name', 'Name', 'ShippingStreet', 'ShippingCity', 'ShippingState', 'ShippingPostalCode', 'ShippingCounty', 'Total Weight', 'Total Rescues']
+    # TODO add Total_Weight__c and Total_Rescues__c once new fields and hierarchy are in Salesforce
+    adminAccountsDF.columns = ['Parent Name', 'Name', 'ShippingStreet', 'ShippingCity', 'ShippingState', 'ShippingPostalCode', 'County__c']
 
     # clean Accounts data
     salesforceAccountsDF = salesforceAccountsDF[salesforceAccountsDF['RecordTypeId'] == accountType]
@@ -213,7 +214,7 @@ def uploadAccounts(salesforceAccountsDF, adminAccountsDF, accountType, session, 
             uploadDFRows.append(row.values)
         else:
             # create generic record for the new parent account
-            parentRow = [parentName, parentName, None, None, None, None, None, None, None, None, accountType]
+            parentRow = [parentName, parentName, None, None, None, None, None, None, accountType]
             uploadDFRows.append(parentRow)
             # add child account to the second job
             uploadDF2Rows.append(row.values)
@@ -248,7 +249,7 @@ def uploadAccounts(salesforceAccountsDF, adminAccountsDF, accountType, session, 
     # fix zip code formatting
     if not uploadDF2['ShippingPostalCode'].dtype == 'object':
         uploadDF2['ShippingPostalCode'] = uploadDF2['ShippingPostalCode'].astype('Int64')
-    
+
     # drop parent name column and upload the new child accounts to salesforce
     uploadDF2.drop(axis='columns', columns=['Parent Name'], inplace=True)    
     executeSalesforceIngestJob('insert', uploadDF2.to_csv(index=False), 'Account', session, uri)
@@ -312,7 +313,8 @@ def uploadFoodDonors(accountsDF, session, uri):
 
     # filter out unnecessary data columns
     # NOTE: for donors, shipping street is currently just line1, line2 is NA for all records
-    donorsDF = donorsDF[['Name', 'location_name', 'line1', 'city', 'state', 'zip', 'total_weight', 'total_rescues', 'county']]
+    # TODO: add total_weight and total_rescues once new fields and hierarchy are in Salesforce
+    donorsDF = donorsDF[['Name', 'location_name', 'line1', 'city', 'state', 'zip', 'county']]
 
     # upload Food Donors (type ID: '0123t000000YYv2AAG') to Salesforce
     uploadAccounts(accountsDF, donorsDF, '0123t000000YYv2AAG', session, uri)
