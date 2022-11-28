@@ -325,7 +325,8 @@ def uploadNonprofitPartners(accountsDF, session, uri):
     partnersDF = pd.read_csv('lastmile_partners.csv')
 
     # filter out unnecessary data columns
-    partnersDF = partnersDF[['Name', 'location_name', 'line1', 'line2', 'city', 'state', 'zip', 'Weight', 'rescues']]
+    # TODO: add back Weight and rescues columns once new fields and hierarchy in Salesforce
+    partnersDF = partnersDF[['Name', 'location_name', 'line1', 'city', 'state', 'zip']]
     
     # add dummy column for county because admin tool nonprofits data doesn't store county
     partnersDF['county'] = ''
