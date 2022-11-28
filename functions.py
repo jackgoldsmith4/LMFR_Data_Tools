@@ -1,6 +1,7 @@
 from zeep import Client
 from io import StringIO
 import pandas as pd
+import numpy as np
 import datetime
 import requests
 import json
@@ -263,45 +264,45 @@ def uploadFoodRescues(rescuesDF, session, uri):
     salesforceContactsDF = getDataframeFromSalesforce('SELECT Id, Name, AccountId FROM Contact', session, uri)
 
     # cleanup rescuesDF
-    rescuesDF.drop(axis='columns', columns=['Donor Name', 'Recipient Name'], inplace=True)
-    rescuesDF = rescuesDF[(rescuesDF['Rescue State'] == 'canceled') | (rescuesDF['Rescue State'] == 'completed')]
+    rescuesDF.drop(axis='columns', columns=['donor_name', 'recipient_name'], inplace=True)
+    rescuesDF = rescuesDF[(rescuesDF['rescue_state'] == 'Canceled') | (rescuesDF['rescue_state'] == 'Complete')]
     rescuesDF = rescuesDF.reset_index().drop(axis='columns', columns='index')
 
     # get list of Food Donors
     salesforceDonorsDF = salesforceAccountsDF[salesforceAccountsDF['RecordTypeId'] == '0123t000000YYv2AAG']
     salesforceDonorsDF = salesforceDonorsDF[['Id', 'Name']]
     salesforceDonorsDF = salesforceDonorsDF.reset_index().drop(axis='columns', columns=['index'])
-    salesforceDonorsDF.columns = ['Food_Donor_Account_Name__c', 'Donor Location Name']
+    salesforceDonorsDF.columns = ['Food_Donor_Account_Name__c', 'donor_location_name']
 
     # get list of Nonprofit Partners
     salesforcePartnersDF = salesforceAccountsDF[salesforceAccountsDF['RecordTypeId'] == '0123t000000YYv3AAG']
     salesforcePartnersDF = salesforcePartnersDF[['Id', 'Name']]
     salesforcePartnersDF = salesforcePartnersDF.reset_index().drop(axis='columns', columns=['index'])
-    salesforcePartnersDF.columns = ['Agency_Name__c', 'Recipient Location Name']
+    salesforcePartnersDF.columns = ['Agency_Name__c', 'recipient_location_name']
 
     # get list of Volunteers
     salesforceVolunteersDF = salesforceContactsDF[salesforceContactsDF['AccountId'] == '0013t00001teMBwAAM']
     salesforceVolunteersDF = salesforceVolunteersDF[['Id', 'Name']]
     salesforceVolunteersDF = salesforceVolunteersDF.reset_index().drop(axis='columns', columns=['index'])
-    salesforceVolunteersDF.columns = ['Volunteer_Name__c', 'Volunteer Name']
+    salesforceVolunteersDF.columns = ['Volunteer_Name__c', 'volunteer']
 
     # cleanup whitespace in name fields before performing vlookups
-    salesforceDonorsDF = cleanupNameWhitespace(salesforceDonorsDF, 'Donor Location Name')
-    salesforcePartnersDF = cleanupNameWhitespace(salesforcePartnersDF, 'Recipient Location Name')
-    salesforceVolunteersDF = cleanupNameWhitespace(salesforceVolunteersDF, 'Volunteer Name')
-    rescuesDF = cleanupNameWhitespace(rescuesDF, 'Donor Location Name')
-    rescuesDF = cleanupNameWhitespace(rescuesDF, 'Recipient Location Name')
-    rescuesDF['Volunteer Name'] = rescuesDF['Volunteer Name'].astype(str)
-    rescuesDF = cleanupNameWhitespace(rescuesDF, 'Volunteer Name')
+    salesforceDonorsDF = cleanupNameWhitespace(salesforceDonorsDF, 'donor_location_name')
+    salesforcePartnersDF = cleanupNameWhitespace(salesforcePartnersDF, 'recipient_location_name')
+    salesforceVolunteersDF = cleanupNameWhitespace(salesforceVolunteersDF, 'volunteer')
+    rescuesDF = cleanupNameWhitespace(rescuesDF, 'donor_location_name')
+    rescuesDF = cleanupNameWhitespace(rescuesDF, 'recipient_location_name')
+    rescuesDF['volunteer'] = rescuesDF['volunteer'].astype(str)
+    rescuesDF = cleanupNameWhitespace(rescuesDF, 'volunteer')
 
     # Dataframe merges (vlookups) to add links to rescuesDF
-    mergedDF = pd.merge(rescuesDF, salesforceDonorsDF, on='Donor Location Name', how='left')
-    mergedDF = pd.merge(mergedDF, salesforcePartnersDF, on='Recipient Location Name', how='left')
-    mergedDF = pd.merge(mergedDF, salesforceVolunteersDF, on='Volunteer Name', how='left')
+    mergedDF = pd.merge(rescuesDF, salesforceDonorsDF, on='donor_location_name', how='left')
+    mergedDF = pd.merge(mergedDF, salesforcePartnersDF, on='recipient_location_name', how='left')
+    mergedDF = pd.merge(mergedDF, salesforceVolunteersDF, on='volunteer', how='left')
 
     # fix columns to prepare for upload
-    mergedDF.drop(axis='columns', columns=['Donor Location Name', 'Recipient Location Name', 'Volunteer Name'], inplace=True)
-    mergedDF.columns=['Rescue_Id__c', 'Day_of_Pickup__c', 'State__c', 'Description__c', 'Food_Type__c', 'Weight__c', 'Rescue_Detail_URL__c', 'Food_Donor_Account_Name__c', 'Agency_Name__c', 'Volunteer_Name__c']
+    mergedDF.drop(axis='columns', columns=['Unnamed: 0', 'pickup_start', 'donor_location_name', 'recipient_location_name', 'volunteer', 'estimated_quantity', 'reported_quantity', ' unit_weight '], inplace=True)
+    mergedDF.columns=['Rescue_Detail_URL__c', 'Rescue_Id__c', 'Food_Type__c', 'Description__c', 'Type__c', 'State__c', 'County__c', 'Weight__c', 'Food_Donor_Account_Name__c', 'Agency_Name__c', 'Volunteer_Name__c']
 
     # upload rescues to Salesforce
     executeSalesforceIngestJob('insert', mergedDF.to_csv(index=False), 'Food_Rescue__c', session, uri)
@@ -382,10 +383,11 @@ def uploadNewFoodRescues(session, uri):
 
     # read in all rescues currently in Salesforce
     salesforceRescuesDF = getDataframeFromSalesforce('SELECT Id, Rescue_Id__c, Food_Type__c, Weight__c FROM Food_Rescue__c', session, uri).drop_duplicates()
-    salesforceRescuesDF.columns = ['Id', 'Rescue ID', 'Food Type', 'Weight']
+    salesforceRescuesDF.columns = ['Id', 'rescue_id', 'food_type', ' total_weight ']
+    salesforceRescuesDF[' total_weight '] = salesforceRescuesDF[' total_weight '].astype(np.int64)
 
     # find list of rescues not yet in Salesforce
-    mergedDF = pd.merge(rescuesDF, salesforceRescuesDF, on=['Rescue ID', 'Food Type', 'Weight'], how='left')
+    mergedDF = pd.merge(rescuesDF, salesforceRescuesDF, on=['rescue_id', 'food_type', ' total_weight '], how='left')
     mergedDF = mergedDF[mergedDF['Id'].isnull()]
     mergedDF = mergedDF.reset_index().drop(axis='columns', columns=['index', 'Id'])
 
