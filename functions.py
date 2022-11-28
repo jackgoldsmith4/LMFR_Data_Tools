@@ -343,10 +343,16 @@ def uploadVolunteers(contactsDF, session, uri):
     salesforceVolunteersDF = contactsDF[contactsDF['AccountId'] == '0013t00001teMBwAAM']
     salesforceVolunteersDF = salesforceVolunteersDF[['Id', 'Name']]
 
+    # exclude volunteers who aren't Active from the upload
+    volunteersDF = volunteersDF[volunteersDF['user_state'] == 'Active']
+    
     # clean up columns
     volunteersDF = volunteersDF[['first_name', 'last_name', 'email', 'phone', 'address', 'city', 'state', 'zip', 'county']]
-    volunteersDF.columns = ['FirstName', 'LastName', 'Email', 'Phone', 'MailingStreet', 'MailingCity', 'MailingState', 'MailingPostalCode', 'County']
+    volunteersDF.columns = ['FirstName', 'LastName', 'Email', 'Phone', 'MailingStreet', 'MailingCity', 'MailingState', 'MailingPostalCode', 'County__c']
 
+    # exclude volunteers with #admin in last name from the upload
+    volunteersDF = volunteersDF[~(volunteersDF['LastName'].str.contains('#admin'))]
+    
     # create one temp Name column for merging with Salesforce
     volunteersDF['Name'] = volunteersDF['FirstName'] + ' ' + volunteersDF['LastName']
     
@@ -364,7 +370,7 @@ def uploadVolunteers(contactsDF, session, uri):
     volunteersNotInSalesforceDF['Phone'] = volunteersNotInSalesforceDF['Phone'].astype('Int64')
 
     # clean up columns
-    volunteersNotInSalesforceDF = volunteersNotInSalesforceDF[['FirstName', 'LastName', 'Email', 'Phone', 'MailingStreet', 'MailingCity', 'MailingState', 'MailingPostalCode', 'County', 'AccountId']]
+    volunteersNotInSalesforceDF = volunteersNotInSalesforceDF[['FirstName', 'LastName', 'Email', 'Phone', 'MailingStreet', 'MailingCity', 'MailingState', 'MailingPostalCode', 'County__c', 'AccountId']]
 
     # upload Volunteers to Salesforce
     executeSalesforceIngestJob('insert', volunteersNotInSalesforceDF.to_csv(index=False), 'Contact', session, uri)
