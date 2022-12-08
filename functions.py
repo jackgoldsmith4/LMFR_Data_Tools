@@ -356,7 +356,7 @@ def uploadVolunteers(contactsDF, session, uri):
     volunteersDF.columns = ['FirstName', 'LastName', 'Email', 'Phone', 'MailingStreet', 'MailingCity', 'MailingState', 'MailingPostalCode', 'County__c']
 
     # exclude volunteers with #admin in last name from the upload
-    volunteersDF = volunteersDF[~(volunteersDF['LastName'].str.contains('#admin'))]
+    volunteersDF = volunteersDF[~volunteersDF["LastName"].str.contains("#admin", na=False)]
     
     # create one temp Name column for merging with Salesforce
     volunteersDF['Name'] = volunteersDF['FirstName'] + ' ' + volunteersDF['LastName']
