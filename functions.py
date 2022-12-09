@@ -388,7 +388,10 @@ def uploadNewFoodRescues(session, uri):
     # read in all rescues currently in Salesforce
     salesforceRescuesDF = getDataframeFromSalesforce('SELECT Id, Rescue_Id__c, Food_Type__c, Weight__c FROM Food_Rescue__c', session, uri).drop_duplicates()
     salesforceRescuesDF.columns = ['Id', 'rescue_id', 'food_type', ' total_weight ']
+
+    # clarify types for total_weight column in both DFs
     salesforceRescuesDF[' total_weight '] = salesforceRescuesDF[' total_weight '].astype(np.int64)
+    rescuesDF[' total_weight '] = rescuesDF[' total_weight '].astype(np.int64)
 
     # find list of rescues not yet in Salesforce
     mergedDF = pd.merge(rescuesDF, salesforceRescuesDF, on=['rescue_id', 'food_type', ' total_weight '], how='left')
