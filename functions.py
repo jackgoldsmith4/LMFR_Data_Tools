@@ -391,6 +391,8 @@ def uploadNewFoodRescues(session, uri):
 
     # clarify types for total_weight column in both DFs
     salesforceRescuesDF[' total_weight '] = salesforceRescuesDF[' total_weight '].astype(np.int64)
+    # clean up admin rescues due to new format
+    rescuesDF = rescuesDF[rescuesDF[' total_weight '] != 'Please assign weight']
     rescuesDF[' total_weight '] = rescuesDF[' total_weight '].astype(np.int64)
 
     # find list of rescues not yet in Salesforce
