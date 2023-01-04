@@ -304,9 +304,13 @@ def uploadFoodRescues(rescuesDF, session, uri):
     mergedDF = pd.merge(mergedDF, salesforcePartnersDF, on='recipient_location_name', how='left')
     mergedDF = pd.merge(mergedDF, salesforceVolunteersDF, on='volunteer', how='left')
 
+    # fix pickup_start column
+    mergedDF['pickup_start'] = pd.to_datetime(mergedDF['pickup_start'], infer_datetime_format=True)
+    mergedDF['pickup_start'] = mergedDF['pickup_start'].dt.date
+
     # fix columns to prepare for upload
-    mergedDF.drop(axis='columns', columns=['Unnamed: 0', 'pickup_start', 'donor_location_name', 'recipient_location_name', 'volunteer', 'estimated_quantity', 'reported_quantity', ' unit_weight '], inplace=True)
-    mergedDF.columns=['Rescue_Detail_URL__c', 'Rescue_Id__c', 'Food_Type__c', 'Description__c', 'Type__c', 'State__c', 'County__c', 'Weight__c', 'Food_Donor_Account_Name__c', 'Agency_Name__c', 'Volunteer_Name__c']
+    mergedDF.drop(axis='columns', columns=['Unnamed: 0', 'donor_location_name', 'recipient_location_name', 'volunteer', 'estimated_quantity', 'reported_quantity', ' unit_weight '], inplace=True)
+    mergedDF.columns=['Rescue_Detail_URL__c', 'Rescue_Id__c', 'Day_of_Pickup__c', 'Food_Type__c', 'Description__c', 'Type__c', 'State__c', 'County__c', 'Weight__c', 'Food_Donor_Account_Name__c', 'Agency_Name__c', 'Volunteer_Name__c']
 
     # upload rescues to Salesforce
     executeSalesforceIngestJob('insert', mergedDF.to_csv(index=False), 'Food_Rescue__c', session, uri)
