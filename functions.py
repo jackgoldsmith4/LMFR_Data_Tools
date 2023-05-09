@@ -76,6 +76,7 @@ def getDataframeFromSalesforce(query, session, uri):
         print('Query job created.')
     else:
         print('Query job creation failed:\n' + str(response.json()))
+        print('status code: ' + str(response.status_code))
         sys.exit()
 
     # pull out job ID to use for future requests
@@ -356,15 +357,15 @@ def uploadVolunteers(contactsDF, session, uri):
     volunteersDF = pd.read_csv('lastmile_volunteers.csv')
 
     # filter all Contacts to just get Food Rescue Heroes (id: '0013t00001teMBwAAM')
-    salesforceVolunteersDF = contactsDF[contactsDF['AccountId'] == '0013t00001teMBwAAM']
-    salesforceVolunteersDF = salesforceVolunteersDF[['Id', 'Name']]
+    salesforceVolunteersDF = contactsDF[contactsDF['npsp__Primary_Affiliation__c'] == '0013t00001teMBwAAM']
+    salesforceVolunteersDF = salesforceVolunteersDF[['Id', 'Name']] # TODO keep volunteer ID
 
     # exclude volunteers who aren't Active from the upload
     volunteersDF = volunteersDF[volunteersDF['user_state'] == 'Active']
     
     # clean up columns
-    volunteersDF = volunteersDF[['first_name', 'last_name', 'email', 'phone', 'address', 'city', 'state', 'zip', 'county']]
-    volunteersDF.columns = ['FirstName', 'LastName', 'Email', 'Phone', 'MailingStreet', 'MailingCity', 'MailingState', 'MailingPostalCode', 'County__c']
+    volunteersDF = volunteersDF[['user_id', 'first_name', 'last_name', 'email', 'phone', 'address', 'city', 'state', 'zip', 'county']]
+    volunteersDF.columns = ['Volunteer_Id__c', 'FirstName', 'LastName', 'Email', 'Phone', 'MailingStreet', 'MailingCity', 'MailingState', 'MailingPostalCode', 'County__c']
 
     # exclude volunteers with #admin in last name from the upload
     volunteersDF = volunteersDF[~volunteersDF["LastName"].str.contains("#admin", na=False)]
@@ -377,16 +378,22 @@ def uploadVolunteers(contactsDF, session, uri):
     salesforceVolunteersDF = cleanupNameWhitespace(salesforceVolunteersDF, 'Name')
 
     # find all volunteers in the admin tool not in Salesforce
-    volunteersNotInSalesforceDF = pd.merge(volunteersDF, salesforceVolunteersDF, on='Name', how='left')
+    volunteersNotInSalesforceDF = pd.merge(volunteersDF, salesforceVolunteersDF, on='Name', how='left') # TODO merge on volunteer ID
     volunteersNotInSalesforceDF = volunteersNotInSalesforceDF[volunteersNotInSalesforceDF['Id'].isnull()]
     volunteersNotInSalesforceDF = volunteersNotInSalesforceDF.reset_index().drop(axis='columns', columns=['index', 'Id'])
 
-    # add a column to register these Contacts as Volunteers, format phone numbers
-    volunteersNotInSalesforceDF['AccountId'] = '0013t00001teMBwAAM'
+    ###
+    # TODO: before uploading volunteers, create parent accounts for each new volunteer
+    # - then query accounts, find based on primary contact ID (or some other way to find the correct account ID
+    # - finally, for each contact, do a merge to add the AccountId field to the DF to be uploaded
+    ###
+    
+    # add a column to register these Contacts as Food Rescue Heroes via the Primary Affiliation field
+    volunteersNotInSalesforceDF['npsp__Primary_Affiliation__c'] = '0013t00001teMBwAAM'
+    
+    # format phone numbers, clean up columns
     volunteersNotInSalesforceDF['Phone'] = volunteersNotInSalesforceDF['Phone'].astype('Int64')
-
-    # clean up columns
-    volunteersNotInSalesforceDF = volunteersNotInSalesforceDF[['FirstName', 'LastName', 'Email', 'Phone', 'MailingStreet', 'MailingCity', 'MailingState', 'MailingPostalCode', 'County__c', 'AccountId']]
+    volunteersNotInSalesforceDF = volunteersNotInSalesforceDF[['FirstName', 'LastName', 'Email', 'Phone', 'MailingStreet', 'MailingCity', 'MailingState', 'MailingPostalCode', 'County__c', 'npsp__Primary_Affiliation__c']]
 
     # upload Volunteers to Salesforce
     executeSalesforceIngestJob('insert', volunteersNotInSalesforceDF.to_csv(index=False), 'Contact', session, uri)
