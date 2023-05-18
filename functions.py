@@ -31,8 +31,8 @@ def loginToSalesforce(username, password, securityToken):
 # need to pull client ID and client secret from a sandbox in Salesforce and plug them into this function below
 def loginToSalesforceSANDBOX(username, password, securityToken):
     # API variables for development mode
-    clientId = '3MVG9ZM6Cuht.9Su3RHqeljw6syINmMC8N5xx4YiKmu9hvKXPiUUAveeQVvyxMRN35jcdwjYUPaKugF1uam13'
-    clientSecret = 'F37DAB77E8D5C310E1480FEEACC6E6601579640F1C1B96702B5F2464EAD5725C'
+    clientId = ''
+    clientSecret = ''
     
     headers = {'Content-Type': 'application/x-www-form-urlencoded'}
     data = {
