@@ -353,12 +353,11 @@ def uploadNonprofitPartners(accountsDF, session, uri):
     
 # wrapper function to upload Volunteers => purpose is to hide code from the IPYNB
 def uploadVolunteers(contactsDF, session, uri):
+    # filter all Contacts to just get Volunteers (VolunteerId != null)
+    salesforceVolunteersDF = contactsDF[contactsDF['Volunteer_Id__c'].notnull()]
+    
     # load volunteer data from admin tool
     volunteersDF = pd.read_csv('lastmile_volunteers.csv')
-
-    # filter all Contacts to just get Food Rescue Heroes (id: '0013t00001teMBwAAM')
-    salesforceVolunteersDF = contactsDF[contactsDF['npsp__Primary_Affiliation__c'] == '0013t00001teMBwAAM']
-    salesforceVolunteersDF = salesforceVolunteersDF[['Id', 'Name']] # TODO keep volunteer ID
 
     # exclude volunteers who aren't Active from the upload
     volunteersDF = volunteersDF[volunteersDF['user_state'] == 'Active']
@@ -369,31 +368,17 @@ def uploadVolunteers(contactsDF, session, uri):
 
     # exclude volunteers with #admin in last name from the upload
     volunteersDF = volunteersDF[~volunteersDF["LastName"].str.contains("#admin", na=False)]
-    
-    # create one temp Name column for merging with Salesforce
-    volunteersDF['Name'] = volunteersDF['FirstName'] + ' ' + volunteersDF['LastName']
-    
-    # cleanup whitespace in the Name fields to increase matches
-    volunteersDF = cleanupNameWhitespace(volunteersDF, 'Name')
-    salesforceVolunteersDF = cleanupNameWhitespace(salesforceVolunteersDF, 'Name')
 
-    # find all volunteers in the admin tool not in Salesforce
-    volunteersNotInSalesforceDF = pd.merge(volunteersDF, salesforceVolunteersDF, on='Name', how='left') # TODO merge on volunteer ID
+    # do a merge to find all volunteers in the admin tool not in Salesforce
+    # merge is done using unique Volunteer ID from the admin tool
+    volunteersNotInSalesforceDF = pd.merge(volunteersDF, salesforceVolunteersDF, on='Volunteer_Id__c', how='left')
     volunteersNotInSalesforceDF = volunteersNotInSalesforceDF[volunteersNotInSalesforceDF['Id'].isnull()]
     volunteersNotInSalesforceDF = volunteersNotInSalesforceDF.reset_index().drop(axis='columns', columns=['index', 'Id'])
-
-    ###
-    # TODO: before uploading volunteers, create parent accounts for each new volunteer
-    # - then query accounts, find based on primary contact ID (or some other way to find the correct account ID
-    # - finally, for each contact, do a merge to add the AccountId field to the DF to be uploaded
-    ###
-    
-    # add a column to register these Contacts as Food Rescue Heroes via the Primary Affiliation field
-    volunteersNotInSalesforceDF['npsp__Primary_Affiliation__c'] = '0013t00001teMBwAAM'
     
     # format phone numbers, clean up columns
     volunteersNotInSalesforceDF['Phone'] = volunteersNotInSalesforceDF['Phone'].astype('Int64')
-    volunteersNotInSalesforceDF = volunteersNotInSalesforceDF[['FirstName', 'LastName', 'Email', 'Phone', 'MailingStreet', 'MailingCity', 'MailingState', 'MailingPostalCode', 'County__c', 'npsp__Primary_Affiliation__c']]
+    volunteersNotInSalesforceDF['Volunteer_Id__c'] = volunteersNotInSalesforceDF['Volunteer_Id__c'].astype('Int64')
+    volunteersNotInSalesforceDF = volunteersNotInSalesforceDF[['Volunteer_Id__c', 'FirstName', 'LastName', 'Email', 'Phone', 'MailingStreet', 'MailingCity', 'MailingState', 'MailingPostalCode', 'County__c']]
 
     # upload Volunteers to Salesforce
     executeSalesforceIngestJob('insert', volunteersNotInSalesforceDF.to_csv(index=False), 'Contact', session, uri)
@@ -470,12 +455,14 @@ def findDuplicateNonprofitPartners(accountsDF, session, uri):
 
     return findDuplicateRecords(nonprofitPartnersDF, 'Name')
 
+### OLD ###
 # wrapper function that returns duplicate Volunteer Contacts in Salesforce
 def findDuplicateVolunteers(contactsDF, session, uri):
     # filter all Contacts to just get Food Rescue Heroes (id: '0013t00001teMBwAAM')
     volunteersDF = contactsDF[contactsDF['AccountId'] == '0013t00001teMBwAAM']
 
     return findDuplicateRecords(volunteersDF, 'Name')
+###########
 
 # function to find old rescues that haven't been marked as completed or canceled
 def findIncompleteRescues():
